@@ -1,9 +1,12 @@
 plugins {
-	id 'fabric-loom' version '1.14-SNAPSHOT'
-	// NOTE: Loom 1.14 is the version officially recommended by Fabric
-	// for Minecraft 1.21.11 development (fabricmc.net/2025/12/05/12111.html).
-	// If a stable (non -SNAPSHOT) 1.14.x has been published by the time
-	// you build this, pin to that exact stable version instead.
+	id 'fabric-loom' version '1.14.10'
+	// Loom 1.14.10: confirmed stable release supporting Gradle 8.14+ and
+	// 9.0 (see FabricMC/fabric-loom GitHub Releases). Pinned to this exact
+	// stable version rather than a -SNAPSHOT build for reproducible CI
+	// builds. If a newer stable Loom has been published by the time you
+	// build this, check whether it requires a newer Gradle version too
+	// (Loom's release notes state 8.x support may be dropped in a future
+	// release in favor of Gradle 9 only).
 	id 'maven-publish'
 }
 
