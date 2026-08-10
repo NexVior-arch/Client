@@ -10,6 +10,19 @@ import java.nio.DoubleBuffer;
  * Polls raw cursor position via GLFW directly (not by mixin-ing into
  * Minecraft's own Mouse class) to compute mouse delta for Free Look.
  *
+ * ⚠️ CURRENTLY UNUSED / DO NOT CALL poll() FROM A TICK LOOP: this class's
+ * GLFW.glfwGetCursorPos() call was confirmed (via a real user crash log)
+ * to trigger a native SIGSEGV specifically on Android through
+ * PojavLauncher/Zalith Launcher's libpojavexec.so GLFW emulation layer:
+ *   "C  [libpojavexec.so+0xb548]  Java_org_lwjgl_glfw_GLFW_nglfwGetCursorPos"
+ * A native segfault happens below the JVM and cannot be caught by any
+ * try/catch in this file or its caller — the try/catch below is retained
+ * for OTHER possible failure modes (e.g. a null window on desktop during
+ * early startup) but provides no protection against this specific crash.
+ * PvpFeatureManager no longer calls poll() as a result. Do not re-wire
+ * this into a tick loop without a platform check (e.g. detecting
+ * PojavLauncher/mobile environments) that has been verified safe.
+ *
  * Why this approach instead of a Mouse mixin: GLFW's C API surface
  * (glfwGetCursorPos) is stable and version-independent — it does not
  * change across Minecraft/Yarn updates the way internal Mouse class

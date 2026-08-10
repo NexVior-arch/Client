@@ -7,6 +7,13 @@ import com.nexvior.client.config.FreeLookConfig;
  * Holds the current Free Look camera offset (extra yaw/pitch applied ONLY
  * to the rendered camera, never to the player entity's actual rotation).
  *
+ * ⚠️ CURRENTLY UNUSED: PvpFeatureManager no longer calls into this class
+ * or FreeLookInputHandler, because FreeLookInputHandler's GLFW cursor
+ * polling was found to crash natively (SIGSEGV) on Android via
+ * PojavLauncher/Zalith Launcher's GLFW emulation layer. See
+ * PvpFeatureManager's class doc for the full crash log and rationale
+ * before re-wiring this.
+ *
  * This class is intentionally "dumb" — it just stores two floats and
  * whether Free Look is currently active. The actual mouse-look input
  * capture and the camera-render override live in FreeLookMixin, kept

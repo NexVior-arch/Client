@@ -1,8 +1,6 @@
 package com.nexvior.client.pvp;
 
 import com.nexvior.client.NexViorClient;
-import com.nexvior.client.config.ConfigManager;
-import com.nexvior.client.config.FreeLookConfig;
 import com.nexvior.client.hud.KeybindManager;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -12,10 +10,25 @@ import org.lwjgl.glfw.GLFW;
 
 /**
  * Registers and drives PvP-support features that need a persistent
- * per-tick handler: currently just Free Look. Kept separate from
- * KeybindManager (which owns the HUD Editor keybind) so PvP feature
- * keybinds and HUD keybinds can evolve independently as more PvP
- * utilities are added.
+ * per-tick handler.
+ *
+ * FREE LOOK DISABLED: Free Look (and its underlying FreeLookInputHandler,
+ * which polled GLFW.glfwGetCursorPos every tick) has been intentionally
+ * disabled. It was found to trigger a native SIGSEGV crash (not a
+ * catchable Java exception — segfaults happen below the JVM, so no
+ * try/catch in this codebase could ever have caught it) specifically on
+ * Android via PojavLauncher/Zalith Launcher's libpojavexec.so GLFW
+ * emulation layer, confirmed via a real crash log:
+ *   "C  [libpojavexec.so+0xb548]  Java_org_lwjgl_glfw_GLFW_nglfwGetCursorPos"
+ * This is a limitation of that Android GLFW emulation layer, not a bug in
+ * NexVior's logic — the same code is a standard, safe pattern on desktop
+ * Java Minecraft. Since NexVior cannot distinguish "real desktop GLFW" from
+ * "emulated Android GLFW" at runtime in a way that would let it safely
+ * avoid the crashing call, the safest fix is removing the call entirely.
+ * The keybind is left registered (harmless, just unused) so a future
+ * reintroduction of this feature has a natural home; FreeLookHandler and
+ * FreeLookInputHandler source files are left in place but are no longer
+ * invoked.
  */
 public final class PvpFeatureManager {
 
@@ -25,10 +38,8 @@ public final class PvpFeatureManager {
 	}
 
 	public static void register() {
-		// Default: LEFT_ALT — chosen because it's rarely bound to anything
-		// else during normal PvP play (WASD, mouse buttons, hotbar 1-9,
-		// space/shift are all in heavy use), and matches convention from
-		// comparable legit clients. Fully rebindable via vanilla Controls.
+		// Kept registered for potential future re-enablement / rebinding
+		// visibility in Controls, but no longer wired to any tick logic.
 		freeLookKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
 			"key.nexvior.free_look",
 			InputUtil.Type.KEYSYM,
@@ -36,51 +47,17 @@ public final class PvpFeatureManager {
 			KeybindManager.CATEGORY
 		));
 
+		NexViorClient.LOGGER.info(
+			"[NexVior] Free Look is currently disabled (see PvpFeatureManager source comments — " +
+			"Android/PojavLauncher GLFW cursor-position crash)."
+		);
+
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
-			try {
-				tickFreeLook();
-			} catch (Throwable t) {
-				NexViorClient.LOGGER.error("[NexVior] Free Look tick handling failed.", t);
-			}
-
-			// Always poll input (even if Free Look is off) so the cursor
-			// baseline stays fresh and re-engaging doesn't jump.
-			FreeLookInputHandler.poll();
-
-			// Mouse button state, shared by CPS and Keystrokes HUD modules.
+			// Mouse BUTTON state (glfwGetMouseButton) is unaffected by the
+			// crash above — that's a different native call than
+			// glfwGetCursorPos, and CI/user testing has shown no issue
+			// with it. CPS and Keystrokes modules still depend on this.
 			InputPollHandler.poll();
 		});
-	}
-
-	private static void tickFreeLook() {
-		FreeLookConfig config = ConfigManager.get().getFreeLook();
-		if (!config.isEnabled()) {
-			// Feature toggled off entirely in config/menu — never engage,
-			// regardless of key state.
-			if (FreeLookHandler.isActive()) {
-				FreeLookHandler.setActive(false);
-			}
-			return;
-		}
-
-		if (config.getMode() == FreeLookConfig.Mode.HOLD) {
-			boolean shouldBeActive = freeLookKey.isPressed();
-			if (shouldBeActive != FreeLookHandler.isActive()) {
-				if (shouldBeActive) {
-					FreeLookInputHandler.resetBaseline();
-				}
-				FreeLookHandler.setActive(shouldBeActive);
-			}
-		} else {
-			// TOGGLE mode: wasPressed() is edge-triggered, safe to poll
-			// every tick without double-toggling on a held key.
-			while (freeLookKey.wasPressed()) {
-				boolean newState = !FreeLookHandler.isActive();
-				if (newState) {
-					FreeLookInputHandler.resetBaseline();
-				}
-				FreeLookHandler.setActive(newState);
-			}
-		}
 	}
 }
